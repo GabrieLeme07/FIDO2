@@ -29,17 +29,17 @@ public class UserRepository : IUserRepository
     private readonly IMongoCollection<User> _users;
     private readonly IMongoCollection<Credential> _credentials;
 
-    public UserRepository(IMongoDatabase database)
+    public UserRepository(IPassKeysDbContext database)
     {
-        _users = database.GetCollection<User>("Users");
-        _credentials = database.GetCollection<Credential>("Credentials");
+        _users = database.Collection<User>();
+        _credentials = database.Collection<Credential>();
     }
 
     public async Task<User> CreateUserAsync(string userName)
     {
         var user = new User
         {
-            Id = Guid.NewGuid().ToString(),
+            Uuid = Guid.NewGuid().ToString(),
             UserName = userName,
             Credentials = new List<Credential>(),
             DisplayName = userName

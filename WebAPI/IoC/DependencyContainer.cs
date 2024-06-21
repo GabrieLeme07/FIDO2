@@ -1,4 +1,5 @@
 ﻿using WebAPI.Infrastructure;
+using WebAPI.Services;
 
 namespace WebAPI.IoC;
 
@@ -8,7 +9,7 @@ public static class DependencyContainer
     {
         services.AddSingleton<IPassKeysDbContext, PassKeysDbContext>();
         services.AddScoped<IUserRepository, UserRepository>();
-
+        services.AddScoped<TokenService>();
         return services;
     }
 }

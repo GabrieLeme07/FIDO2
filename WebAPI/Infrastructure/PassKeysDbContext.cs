@@ -18,8 +18,8 @@ public class PassKeysDbContext : IPassKeysDbContext
 
     public PassKeysDbContext(IConfiguration configuration)
     {
-        var mongoClient = new MongoClient(configuration["Database-NoSQL-ConnectionString"]);
-        _database = mongoClient.GetDatabase(configuration["Database-Name-PassKeys"]);
+        var mongoClient = new MongoClient(configuration["Database-ConnectionString"]);
+        _database = mongoClient.GetDatabase(configuration["Database-Name"]);
     }
 
     public IMongoCollection<T> Collection<T>()

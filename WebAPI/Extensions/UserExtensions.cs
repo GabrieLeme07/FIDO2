@@ -9,7 +9,7 @@ public static class UserExtensions
     {
         return new Fido2User
         {
-            Id =new Guid(user.Id).ToByteArray(),
+            Id =new Guid(user.Uuid).ToByteArray(),
             Name = user.UserName,
             DisplayName = user.DisplayName
         };
