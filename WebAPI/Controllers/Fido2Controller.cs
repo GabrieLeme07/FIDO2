@@ -19,24 +19,33 @@ public class Fido2Controller(IFido2 fido2, IUserRepository userRepository, IDist
     [AllowAnonymous]
     public async Task<ActionResult<CredentialOptionsResponse>> CreateCredentialOptions([FromBody] string userName)
     {
+        //VALIDA SE O USER NAME NÃO É VAZIO
         if (string.IsNullOrEmpty(userName))
         {
             return BadRequest("Username is required to create an authentication options");
         }
 
+        //VALIDA SE O EXISTE ALGUM USUARIO COM ESSE USERNAME
         var existingUser = await userRepository.GetUserAsync(userName);
         if (existingUser != null)
         {
             return BadRequest($"Username {userName} is already taken!");
         }
 
+        //CRIA O USUARIO NA BASE
         var user = await userRepository.CreateUserAsync(userName);
-        var excludedCredentials = user.Credentials;
 
-        var credentialOptions = fido2.RequestNewCredential(user.ToFido2User(),
-            excludedCredentials.Select(credential => new PublicKeyCredentialDescriptor(credential.Id)).ToList());
-        await cache.SetAsync(user.Id.ToString(), Encoding.UTF8.GetBytes(credentialOptions.ToJson()));
-        return Ok(new CredentialOptionsResponse(credentialOptions, user.Id));
+        var fido2User = user.ToFido2User();
+
+        var excludedCredentials = user
+            .Credentials
+            .Select(credential => new PublicKeyCredentialDescriptor(credential.Id))
+            .ToList();
+
+        var credentialOptions = fido2.RequestNewCredential(fido2User, excludedCredentials);
+
+        await cache.SetAsync(user.Uuid.ToString(), Encoding.UTF8.GetBytes(credentialOptions.ToJson()));
+        return Ok(new CredentialOptionsResponse(credentialOptions, user.Uuid));
     }
 
     [HttpPut("credential-options")]
@@ -55,17 +64,22 @@ public class Fido2Controller(IFido2 fido2, IUserRepository userRepository, IDist
     public async Task<ActionResult<CreateCredentialResponse>> CreateCredential([FromBody] CreateCredentialRequest createCredentialRequest)
     {
         var userKey = createCredentialRequest.UserId.ToString();
+
         var credentialOptionsBytes = await cache.GetAsync(userKey);
+
         if (credentialOptionsBytes == null)
         {
             return BadRequest();
         }
 
         await cache.RemoveAsync(userKey);
+
+        var attestationResponse = createCredentialRequest.AttestationResponse;
+
         var credentialOptions = CredentialCreateOptions.FromJson(Encoding.UTF8.GetString(credentialOptionsBytes));
-        var credential = await fido2.MakeNewCredentialAsync(createCredentialRequest.AttestationResponse,
-            credentialOptions,
-            (args, _) => userRepository.IsCredentialIdUniqueToUserAsync(args.User.Id, args.CredentialId));
+
+        var credential = await fido2.MakeNewCredentialAsync(attestationResponse, credentialOptions, (args, _) => userRepository.IsCredentialIdUniqueToUserAsync(args.User.Id, args.CredentialId));
+
         if (credential.Result != null)
         {
             await userRepository.AddCredentialToUserAsync(
@@ -74,7 +88,9 @@ public class Fido2Controller(IFido2 fido2, IUserRepository userRepository, IDist
                 credential.Result.PublicKey,
                 credential.Result.Counter,
                 (HttpContext.Items[Constants.Device.PlatformInfoKey] as string)!);
+
             var token = await tokenService.GenerateTokenAsync(createCredentialRequest.UserId);
+
             return Created("", new CreateCredentialResponse(credential, token));
         }
 
@@ -113,8 +129,8 @@ public class Fido2Controller(IFido2 fido2, IUserRepository userRepository, IDist
 
         var existingCredentials = user.Credentials.Select(credential => new PublicKeyCredentialDescriptor(credential.Id));
         var options = fido2.GetAssertionOptions(existingCredentials, userVerificationRequirement);
-        await cache.SetAsync(user.Id.ToString(), Encoding.UTF8.GetBytes(options.ToJson()));
-        return Ok(new AssertionOptionsResponse(options, user.Id));
+        await cache.SetAsync(user.Uuid.ToString(), Encoding.UTF8.GetBytes(options.ToJson()));
+        return Ok(new AssertionOptionsResponse(options, user.Uuid));
     }
 
     [HttpPost("assertion")]

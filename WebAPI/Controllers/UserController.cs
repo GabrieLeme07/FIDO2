@@ -12,7 +12,9 @@ public class UserController(IUserRepository userRepository) : ControllerBase
     [HttpGet("me")]
     public async Task<User> GetCurrentUser()
     {
-        return (await userRepository.GetUserAsync(
-            User.Claims.First(claim => claim.Type == ClaimConstants.UserName).Value))!;
+        var userName = User.Claims.First(claim => claim.Type == ClaimConstants.UserName).Value;
+        var user = await userRepository.GetUserAsync(userName);
+
+        return user;
     }
 }

@@ -12,8 +12,11 @@ public class TokenService(IUserRepository userRepository, IConfiguration configu
     public async Task<string> GenerateTokenAsync(string userId)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]));
-        var user = await userRepository.GetUserAsync(userId);
+
+        var user = await userRepository.GetUserByIdAsync(userId);
+
         var expiry = int.Parse(configuration["Jwt:ExpiryInSeconds"]);
+
         var claims = new Claim[]
         {
             new(ClaimConstants.UserId, user.Id.ToString()),
@@ -26,6 +29,7 @@ public class TokenService(IUserRepository userRepository, IConfiguration configu
             audience: configuration["Jwt:Audience"],
             expires: DateTime.Now.Add(TimeSpan.FromSeconds(expiry)),
             signingCredentials: new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256));
+
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
