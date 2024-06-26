@@ -10,6 +10,8 @@ public static class DependencyContainer
         services.AddSingleton<IPassKeysDbContext, PassKeysDbContext>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<TokenService>();
+        services.AddScoped<OtpService>();
+        services.AddScoped<EmailService>();
         return services;
     }
 }

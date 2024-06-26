@@ -10,7 +10,7 @@ import { SessionConstants } from '../constants';
 
 class PassKeyService {
   async createCredentialOptions(userName) {
-    const response = await axios.post('https://localhost:7214/api/fido2/credential-options', userName, {
+    const response = await axios.post('https://localhost:7214/api/fido2/register/begin', userName, {
       headers: {
         'Content-Type': 'application/json'
       }
@@ -21,6 +21,10 @@ class PassKeyService {
     const credentialOptionsResponse = response.data;
     const options = credentialOptionsResponse.options;
     const abortController = new AbortController();
+
+    const jsonResponse = JSON.stringify(credentialOptionsResponse, null, 2);
+    console.log(jsonResponse);
+
     return {
       options: parseCreationOptionsFromJSON({ publicKey: options, signal: abortController.signal }),
       userId: credentialOptionsResponse.userId
@@ -32,7 +36,7 @@ class PassKeyService {
     if (token === null) {
       throw new Error('Token expired!');
     }
-    const response = await axios.put('https://localhost:7214/api/fido2/credential-options', null, {
+    const response = await axios.put('https://localhost:7214/api/fido2/register/begin', null, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
@@ -53,7 +57,7 @@ class PassKeyService {
   async createCredential(userId, options) {
     try {
       const attestationResponse = await create(options);
-      const response = await axios.post('https://localhost:7214/api/fido2/credential', {
+      const response = await axios.post('https://localhost:7214/api/fido2/register/end', {
             attestationResponse: attestationResponse, 
             userId: userId
         }, {
@@ -73,7 +77,7 @@ class PassKeyService {
 }
 
   async createAssertionOptions(userName) {
-    const response = await axios.post('https://localhost:7214/api/fido2/assertion-options', userName, {
+    const response = await axios.post('https://localhost:7214/api/fido2/autenticate/begin', userName, {
       headers: {
         'Content-Type': 'application/json'
       }
@@ -98,7 +102,7 @@ class PassKeyService {
       throw new Error('Mediation is not supported :(');
     }
     const assertionResponse = await get(options);
-    const response = await axios.post('https://localhost:7214/api/fido2/assertion', {
+    const response = await axios.post('https://localhost:7214/api/fido2/autenticate/end', {
       assertionRawResponse: assertionResponse.toJSON(),
       userId: userId
     }, {

@@ -2,7 +2,7 @@
 
 public class Credential
 {
-    public byte[] Id { get; set; }
+    public string Id { get; set; }
     public byte[] PublicKey { get; set; }
     public string UserId { get; set; }
     public uint SignCounter { get; set; }

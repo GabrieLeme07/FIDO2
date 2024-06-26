@@ -13,17 +13,17 @@ public interface IUserRepository
 
     Task<User?> GetUserByIdAsync(string userId);
 
-    ValueTask<Credential?> GetCredentialAsync(byte[] credentialId);
+    ValueTask<Credential?> GetCredentialAsync(string credentialId);
 
-    Task<bool> IsCredentialIdUniqueToUserAsync(byte[] userHandle, byte[] credentialId);
+    Task<bool> IsCredentialIdUniqueToUserAsync(byte[] userHandle, string credentialId);
 
-    Task<bool> VerifyCredentialOwnershipAsync(byte[] userHandle, byte[] credentialId);
+    Task<bool> VerifyCredentialOwnershipAsync(byte[] userHandle, string credentialId);
 
     Task UpdateCredentialAsync(Credential credential);
 
-    Task AddCredentialToUserAsync(string userId, byte[] credentialId, byte[] publicKey, uint signCounter, string lastUsedPlatformInfo);
+    Task AddCredentialToUserAsync(string userId, string credentialId, byte[] publicKey, uint signCounter, string lastUsedPlatformInfo);
 
-    Task<CredentialRevokeResult> RevokeCredentialAsync(string userId, byte[] credentialId);
+    Task<CredentialRevokeResult> RevokeCredentialAsync(string userId, string credentialId);
 }
 
 public class UserRepository : IUserRepository
@@ -65,20 +65,20 @@ public class UserRepository : IUserRepository
         return await _users.Find(filter).FirstOrDefaultAsync();
     }
 
-    public async ValueTask<Credential?> GetCredentialAsync(byte[] credentialId)
+    public async ValueTask<Credential?> GetCredentialAsync(string credentialId)
     {
         var user = await _users.Find(u => u.Credentials.Any(c => c.Id == credentialId)).FirstOrDefaultAsync();
         return user?.Credentials.FirstOrDefault(c => c.Id == credentialId);
     }
 
-    public async Task<bool> IsCredentialIdUniqueToUserAsync(byte[] userHandle, byte[] credentialId)
+    public async Task<bool> IsCredentialIdUniqueToUserAsync(byte[] userHandle, string credentialId)
     {
         var userId = new Guid(userHandle).ToString();
         var user = await GetUserByIdAsync(userId);
         return user?.Credentials.All(c => c.Id != credentialId) ?? true;
     }
 
-    public async Task<bool> VerifyCredentialOwnershipAsync(byte[] userHandle, byte[] credentialId)
+    public async Task<bool> VerifyCredentialOwnershipAsync(byte[] userHandle, string credentialId)
     {
         var userId = new Guid(userHandle).ToString();
         var credential = await GetCredentialAsync(credentialId);
@@ -111,7 +111,7 @@ public class UserRepository : IUserRepository
         }
     }
 
-    public async Task AddCredentialToUserAsync(string userId, byte[] credentialId, byte[] publicKey, uint signCounter, string lastUsedPlatformInfo)
+    public async Task AddCredentialToUserAsync(string userId, string credentialId, byte[] publicKey, uint signCounter, string lastUsedPlatformInfo)
     {
         var credential = new Credential
         {
@@ -128,7 +128,7 @@ public class UserRepository : IUserRepository
         await _users.UpdateOneAsync(filter, update);
     }
 
-    public async Task<CredentialRevokeResult> RevokeCredentialAsync(string userId, byte[] credentialId)
+    public async Task<CredentialRevokeResult> RevokeCredentialAsync(string userId, string credentialId)
     {
         var filter = Builders<User>.Filter.Eq(u => u.Uuid, userId);
         var update = Builders<User>.Update.PullFilter(u => u.Credentials, c => c.Id == credentialId);
