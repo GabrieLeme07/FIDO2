@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Distributed;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using WebAPI.Extensions;
 using WebAPI.Infrastructure;
@@ -46,11 +47,12 @@ public class Fido2Controller(
     [Authorize(Roles = "CanValidateOtp")]
     public async Task<IActionResult> ValidateOtp([FromBody] ValidateOtpRequest request)
     {
-        var userName = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
-        if (userName == null)
+        var userNameClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
+        if (userNameClaim == null)
         {
             return Unauthorized();
         }
+        var userName = userNameClaim.Value;
 
         // Recupere o hash armazenado associado ao userName
         var storedHash = RetrieveStoredHashForUser(userName);
@@ -73,11 +75,12 @@ public class Fido2Controller(
     [Authorize(Roles = "CanAccessPasskey")]
     public async Task<ActionResult<CredentialOptionsResponse>> CreateCredentialOptions()
     {
-        var userName = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
-        if (userName == null)
+        var userNameClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
+        if (userNameClaim == null)
         {
             return Unauthorized();
         }
+        var userName = userNameClaim.Value;
 
         // Valida se o userName não é vazio
         if (string.IsNullOrEmpty(userName))
@@ -223,6 +226,6 @@ public class Fido2Controller(
     private string RetrieveStoredHashForUser(string userName)
     {
         // Implemente a lógica para recuperar o hash armazenado do banco de dados
-        return "storedHash"; // Exemplo de hash armazenado
+        return "LgOufObUq4sC5tcppj+TO7yTKH0AhvHg8exKL15ZHO4="; // Exemplo de hash armazenado
     }
 }
