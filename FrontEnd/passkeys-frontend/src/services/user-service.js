@@ -25,7 +25,7 @@ class UserService {
             throw new Error('Token expired!');
         }
 
-        const response = await fetch('https://localhost:7214/api/users/me', {
+        const response = await fetch('https://localhost:7214/v1/User/me', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',

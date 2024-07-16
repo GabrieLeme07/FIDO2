@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Typography, Snackbar, Button, Container, TextField, Divider, IconButton, Card, CardContent, Table, TableHead, TableRow, TableCell, TableBody, TableContainer } from '@mui/material';
+import { AppBar, Toolbar, Typography, Snackbar, Button, Container, TextField, IconButton, Card, CardContent, Table, TableHead, TableRow, TableCell, TableBody, TableContainer } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-// Mock services (substitua pelas suas implementações reais)
 import passKeyService from './services/passkey-service';
 import sessionStorageService from './services/session-storage-service';
-import userService from '../src/services/user-service';
-import { SessionConstants } from '../src/constants';
+import userService from './services/user-service';
+import otpService from './services/otp-service';
+import { SessionConstants } from './constants';
+import {
+  get,
+} from '@github/webauthn-json/browser-ponyfill';
 
 const headers = [
   { title: 'Id', value: 'id' },
@@ -21,6 +24,9 @@ const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(sessionStorageService.get(SessionConstants.TokenKey) != null);
   const [search, setSearch] = useState("");
   const [userName, setUserName] = useState("");
+  const [otp, setOtp] = useState("");
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [bearerToken, setBearerToken] = useState("");
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarColor, setSnackbarColor] = useState("success");
   const [user, setUser] = useState({ credentials: [] });
@@ -47,10 +53,12 @@ const App = () => {
 
   const logout = () => {
     sessionStorageService.clear(SessionConstants.TokenKey);
+    setIsOtpSent(false);
     setIsLoggedIn(false);
   };
 
   const handleError = (error) => {
+    console.log("SEGUNDA CHAMADA", error);
     setSnackbarColor("error");
     setSnackbarMessage(error.message);
   };
@@ -89,12 +97,69 @@ const App = () => {
     }
   };
 
-  const loginWithPassKeys = async () => {
+
+  const handlePasskeyLogin = async () => {
+    try {
+      const credentialOptions = await passKeyService.createCredentialOptions();
+      const result = await passKeyService.createCredential(credentialOptions.userId, credentialOptions.options);
+      const { credentialMakeResult, token } = result;
+
+      if (credentialMakeResult.status === 'ok') {
+        sessionStorageService.set(SessionConstants.TokenKey, token, SessionConstants.TokenExpiryTime);
+        await refreshUser();
+        setIsLoggedIn(true);
+        handleLoginSuccess();
+      }
+    } catch (error) {
+      handleError(error);
+    }
+  };
+
+  const verifyOtp = async () => {
+    if (!otp) {
+      setSnackbarColor("error");
+      setSnackbarMessage("OTP can't be empty!");
+      return;
+    }
+
+    try {
+      const token = await otpService.verifyOtp(otp, bearerToken);
+      setBearerToken(token); // Update the bearer token with the new one
+      sessionStorageService.set(SessionConstants.TokenKey, token, SessionConstants.TokenExpiryTime);
+      
+      //var hasCredential = await passKeyService.checkCredential();
+
+        await loginWithPassKeys();
+      
+      //await handlePasskeyLogin(); 
+    } catch (error) {
+      handleError(error);
+    }
+  };
+
+  const sendOtp = async () => {
     if (!validateInputs()) return;
 
     try {
-      const assertionOptions = await passKeyService.createAssertionOptions(userName);
-      const result = await passKeyService.verifyAssertion(assertionOptions.userId, assertionOptions.options);
+      const { token } = await otpService.generateOtp(userName);
+      setBearerToken(token);
+      setIsOtpSent(true);
+      setSnackbarColor("success");
+      setSnackbarMessage("OTP sent successfully!");
+    } catch (error) {
+      handleError(error);
+    }
+  };
+
+  const loginWithPassKeys = async () => {
+    
+    console.log("PRIMEIRA CHAMADA");
+    try {
+      const assertionOptions = await passKeyService.createAssertionOptions();
+
+      console.log("RESPOSTA DO CREATE",assertionOptions );
+
+      const result = await passKeyService.verifyAssertion(assertionOptions.options);
       const { assertionVerificationResult, token } = result;
 
       if (assertionVerificationResult.status === 'ok') {
@@ -137,38 +202,39 @@ const App = () => {
           }
         />
         {!isLoggedIn ? (
-          <>
-            <TextField
-              variant="outlined"
-              label="Username"
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              fullWidth
-            />
-            <Button variant="contained" color="primary" onClick={createLoginPassKey}>
-              Create PassKey Login
-            </Button>
-            <Divider />
-            <Typography align="center">OR</Typography>
-            <Button variant="outlined" color="primary" onClick={loginWithPassKeys}>
-              Login with PassKeys
-            </Button>
-          </>
+          !isOtpSent ? (
+            <div align="center">
+              <TextField
+                variant="outlined"
+                label="Username"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                fullWidth
+              />
+              <Button variant="contained" color="primary" onClick={loginWithPassKeys}>
+                LOGIN
+              </Button>
+            </div>
+          ) : (
+            <>
+              <TextField
+                variant="outlined"
+                label="OTP"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                fullWidth
+              />
+              <Button variant="contained" color="primary" onClick={verifyOtp}>
+                Verify OTP
+              </Button>
+            </>
+          )
         ) : (
           <>
-            <Typography variant="h4" align="center">Olá, {user.userName}!</Typography>
+            <Typography padding={6} variant="h4" align="center">Olá, {user.userName}!</Typography>
             <Card>
               <CardContent>
-                <TextField
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  label="Search"
-                  variant="outlined"
-                  fullWidth
-                />
-                <Button variant="outlined" color="primary" onClick={registerAdditionalPassKey}>
-                  Add a Passkey
-                </Button>
+                
                 <TableContainer>
                   <Table>
                     <TableHead>
@@ -195,11 +261,11 @@ const App = () => {
                     </TableBody>
                   </Table>
                 </TableContainer>
+                <Button variant="contained" color="secondary" onClick={logout}>
+                  Logout
+                </Button>
               </CardContent>
             </Card>
-            <Button variant="outlined" color="primary" onClick={logout}>
-              Logout
-            </Button>
           </>
         )}
       </Container>
